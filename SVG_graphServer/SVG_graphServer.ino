@@ -18,6 +18,7 @@
  18 Dec    2009  David A. Mellis    first version of the web server
   9 April  2012  Tom Igoe           modified version
  22 July   2015  ChrisMicro         SVG graphics plot implemented
+ 23 July   2015  ChrisMicro         multible autoscale graphs
 
  */
 
@@ -107,14 +108,20 @@ void text(int x, int y, char *str, int rotation)
 
 #define GRAPHBORDER 40
 
-void graph(graph_t * g)
+void showGraph(graph_t * g)
 {
   int n;
   
+  float xscale=2.0;
+  float yscale=1.0;
+    
+  int xmin;
+  int xmax;
   int ymin= 32767;
   int ymax=-32767;
-
-  g->autoscale=true;
+  
+  xmin=0;
+  xmax=g->data_length;
   
   if(g->autoscale)
   {
@@ -128,7 +135,17 @@ void graph(graph_t * g)
     }
     g->axis[2] = ymin;
     g->axis[3] = ymax;
+  }else
+  {
+    xmin= g->axis[0];
+    xmax= g->axis[1];
+    ymin= g->axis[2];
+    ymax= g->axis[3];
   }
+  
+  xscale=g->width/(float)(xmax-xmin);
+  yscale=g->height/(float)(ymax-ymin);
+  
   //******** start the SVG grafics ********************************************
 
   client.println("<svg xmlns=\"http://www.w3.org/2000/svg\"");
@@ -156,7 +173,22 @@ void graph(graph_t * g)
   client.println("<polyline points=\"");
   for (n = 0; n < g->data_length ; ++n)
   {
-    sprintf(strBuffer, "%d,%d ", n+GRAPHBORDER, g->data[n]+GRAPHBORDER);
+    int x,xn;
+    int y,yn;
+    
+    xn=n;
+    yn=g->data[n];
+    
+    // limit to borders
+    if( xn > xmax) xn=xmax;
+    if( xn < xmin) xn=xmin;
+    if( yn > ymax) yn=ymax;
+    if( yn < ymin) yn=ymin;
+      
+    x =             GRAPHBORDER +  xscale * ( xn - xmin ) ;
+    y = g->height + GRAPHBORDER -  yscale * ( yn - ymin ) ;
+        
+    sprintf(strBuffer, "%d,%d ", x, y);
     client.print(strBuffer);
   }
   client.print("\" ");
@@ -212,11 +244,7 @@ void setup() {
   Graph1.data_length = GRAPH1_LENGTH;
   Graph1.width       = 200;
   Graph1.height      = 150;
-  // xmin xmax ymin ymax 
-  Graph1.axis[0]=-10;  
-  Graph1.axis[1]=100;
-  Graph1.axis[2]=-10;
-  Graph1.axis[3]=1000;  
+  Graph1.autoscale   = true;
   
   Graph2.title       = "Analog Channel 1";
   Graph2.xlabel      = "[n]";
@@ -226,11 +254,10 @@ void setup() {
   Graph2.width       = 300;
   Graph2.height      = 200;
     // xmin xmax ymin ymax 
-  Graph2.axis[0]=-10;  
-  Graph2.axis[1]=100;
-  Graph2.axis[2]=-10;
-  Graph2.axis[3]=1000;  
-  //Graph2.axis        = {0,10,0,100}; // xmin xmax ymin ymax  
+  Graph2.axis[0]     =  -10;  
+  Graph2.axis[1]     =  110;
+  Graph2.axis[2]     =  -10;
+  Graph2.axis[3]     = 1100;  
 }
 
 void loop()
@@ -238,14 +265,16 @@ void loop()
 
   int n;
   
+  
   for (n = 0; n < GRAPH1_LENGTH ; ++n)
   {
     Graph1_data[n]= analogRead(A0);
+    Graph2_data[n]= analogRead(A1);
   }
   
   for (n = 0; n < GRAPH2_LENGTH ; ++n)
   {
-    Graph2_data[n]= analogRead(A1);
+
   }
   
   // listen for incoming clients
@@ -274,16 +303,16 @@ void loop()
           client.println("<html>");
 
           // print text message
-          client.print("analog channel 0 over time ");
-
-          client.println("<br />");
+          client.print("Mult SVG Graph Server ");   client.println("<br />");
+          client.print("for Arduino Uno");          client.println("<br />");
+          client.print("with Ethernet Shield");     client.println("<br />");
 
           client.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
 
           //******** start the SVG grafics ********************************************
           
-          graph(&Graph1);
-          graph(&Graph2);
+          showGraph(&Graph1);
+          showGraph(&Graph2);
 
           break;
         }
