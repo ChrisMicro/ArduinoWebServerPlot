@@ -10,5 +10,7 @@ typedef struct
   uint16_t height;
   char * title;
   char * xlabel;
-  char * ylabel;  
+  char * ylabel;
+  int    axis[4]; // xmin xmax ymin ymax  
+  boolean autoscale;
 } graph_t;

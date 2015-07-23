@@ -43,20 +43,6 @@ byte mac[] = {
 // (port 80 is default for HTTP):
 EthernetServer server(80);
 
-void setup() {
-  // Open serial communications and wait for port to open:
-  Serial.begin(9600);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for Leonardo only
-  }
-
-  // start the Ethernet connection and the server:
-  Ethernet.begin(mac, ip);
-  server.begin();
-  Serial.print("server is at ");
-  Serial.println(Ethernet.localIP());
-}
-
 #define WITDH 5
 #define PREC  1
 
@@ -69,6 +55,8 @@ int16_t Graph1_data[GRAPH1_LENGTH];
 
 #define GRAPH2_LENGTH 100
 int16_t Graph2_data[GRAPH2_LENGTH];
+
+char strBuffer[40];
 
 void printPar(char * str, int value)
 {
@@ -103,10 +91,11 @@ void text(int x, int y, char *str, int rotation)
     // rotation
     client.print("transform=\"rotate(");
     client.print(rotation);
+    client.print(" ");
     client.print(x);
     client.print(",");
     client.print(y);
-    client.print("\"");
+    client.print(")\"");
     
     client.print("style=\"font-size:12px\"");
     client.print(">");
@@ -116,12 +105,30 @@ void text(int x, int y, char *str, int rotation)
     //<text x="0" y="15" fill="red" transform="rotate(30 20,40)">I love SVG</text>
 }
 
-#define GRAPHBORDER 30
+#define GRAPHBORDER 40
 
 void graph(graph_t * g)
 {
   int n;
-  char strBuffer[100];
+  
+  int ymin= 32767;
+  int ymax=-32767;
+
+  g->autoscale=true;
+  
+  if(g->autoscale)
+  {
+    g->axis[0] = 0;  
+    g->axis[1] = g->data_length;
+
+    for(n=0;n<g->data_length;n++)
+    {
+      if(g->data[n]<ymin) ymin=g->data[n];
+      if(g->data[n]>ymax) ymax=g->data[n];
+    }
+    g->axis[2] = ymin;
+    g->axis[3] = ymax;
+  }
   //******** start the SVG grafics ********************************************
 
   client.println("<svg xmlns=\"http://www.w3.org/2000/svg\"");
@@ -161,16 +168,42 @@ void graph(graph_t * g)
   text(g->width/2+GRAPHBORDER,GRAPHBORDER/2,g->title,0);
   
   // print xlabel
-  text(g->width/2+GRAPHBORDER,g->height + GRAPHBORDER + GRAPHBORDER/2 ,g->xlabel,20);  
+  text(g->width/2+GRAPHBORDER,g->height + GRAPHBORDER + GRAPHBORDER/2 ,g->xlabel,0);  
+  
+  // print ylabel
+  text(GRAPHBORDER/2,g->height/2 + GRAPHBORDER ,g->ylabel,-90);
+  
+  // axis xmin
+  sprintf(strBuffer,"%d",g->axis[0]);
+  text(GRAPHBORDER,g->height + GRAPHBORDER + GRAPHBORDER/2 ,strBuffer,0);
+  
+    // axis xmax
+  sprintf(strBuffer,"%d",g->axis[1]);
+  text(GRAPHBORDER+g->width,g->height + GRAPHBORDER + GRAPHBORDER/2 ,strBuffer,0);
+  
+    // axis ymin
+  sprintf(strBuffer,"%d",g->axis[2]);
+  text(GRAPHBORDER/2,g->height + GRAPHBORDER ,strBuffer,0);
+  
+    // axis ymax
+  sprintf(strBuffer,"%d",g->axis[3]);
+  text(GRAPHBORDER/2,GRAPHBORDER ,strBuffer,0);
   
   client.println("</svg>");
 }
 
+void setup() {
+  // Open serial communications and wait for port to open:
+  Serial.begin(9600);
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for Leonardo only
+  }
 
-void loop()
-{
-  char strBuffer[40];
-  int n;
+  // start the Ethernet connection and the server:
+  Ethernet.begin(mac, ip);
+  server.begin();
+  Serial.print("server is at ");
+  Serial.println(Ethernet.localIP());
   
   Graph1.title       = "Analog Channel 0";
   Graph1.xlabel      = "[n]";
@@ -179,20 +212,37 @@ void loop()
   Graph1.data_length = GRAPH1_LENGTH;
   Graph1.width       = 200;
   Graph1.height      = 150;
+  // xmin xmax ymin ymax 
+  Graph1.axis[0]=-10;  
+  Graph1.axis[1]=100;
+  Graph1.axis[2]=-10;
+  Graph1.axis[3]=1000;  
+  
+  Graph2.title       = "Analog Channel 1";
+  Graph2.xlabel      = "[n]";
+  Graph2.ylabel      = "[voltage]";
+  Graph2.data        = Graph2_data;
+  Graph2.data_length = GRAPH2_LENGTH;
+  Graph2.width       = 300;
+  Graph2.height      = 200;
+    // xmin xmax ymin ymax 
+  Graph2.axis[0]=-10;  
+  Graph2.axis[1]=100;
+  Graph2.axis[2]=-10;
+  Graph2.axis[3]=1000;  
+  //Graph2.axis        = {0,10,0,100}; // xmin xmax ymin ymax  
+}
 
+void loop()
+{
+
+  int n;
+  
   for (n = 0; n < GRAPH1_LENGTH ; ++n)
   {
     Graph1_data[n]= analogRead(A0);
   }
   
-  Graph2.title       = "Analog Channel 1";
-  Graph2.xlabel      = "[n]";
-  Graph2.ylabel      = "[v]";
-  Graph2.data        = Graph2_data;
-  Graph2.data_length = GRAPH2_LENGTH;
-  Graph2.width       = 300;
-  Graph2.height      = 200;
-
   for (n = 0; n < GRAPH2_LENGTH ; ++n)
   {
     Graph2_data[n]= analogRead(A1);
