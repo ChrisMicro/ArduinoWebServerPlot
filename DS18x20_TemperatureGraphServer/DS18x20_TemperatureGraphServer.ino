@@ -19,6 +19,7 @@
   9 April  2012  Tom Igoe           modified version
  22 July   2015  ChrisMicro         SVG graphics plot implemented
  23 July   2015  ChrisMicro         multible autoscale graphs
+ 24 July   2015  ChrisMicro         ds18s20 temperature logger
 
  */
 
@@ -126,7 +127,7 @@ void rect(int x,int y,int width, int height)
     printPar("width",width);
     printPar("height",height);
     client.print("style=\"fill:ghostwhite;stroke:black;stroke-width:1;stroke-opacity:0.9\" ");
-    client.print("/>");
+    client.println("/>");
     // <rect x="50" y="20" width="150" height="150"
     //style="fill:blue;stroke:pink;stroke-width:5;fill-opacity:0.1;stroke-opacity:0.9" />
 }
@@ -146,12 +147,12 @@ void text(int x, int y, char *str, int rotation)
     client.print(x);
     client.print(",");
     client.print(y);
-    client.print(")\"");
+    client.print(")\" ");
     
-    client.print("style=\"font-size:12px\"");
+    client.print("style=\"font-size:12px\" ");
     client.print(">");
     client.print(str);
-    client.print("</text>");
+    client.println("</text>");
     //<text x="130" y="40" dx="0 0 0 -160" dy="0 0 0 -15" style="font-size:18px">
     //<text x="0" y="15" fill="red" transform="rotate(30 20,40)">I love SVG</text>
 }
@@ -177,7 +178,7 @@ void showGraph(graph_t * g)
   int xmax;
   int ymin= 32767;
   int ymax=-32767;
-  
+      
   xmin=0;
   //xmax=g->data_length;
   xmax=ringBufGetFillSize(g->ringBuffer)-1;
@@ -188,7 +189,7 @@ void showGraph(graph_t * g)
     //g->axis[1] = g->data_length;
     g->axis[1]=ringBufGetFillSize(g->ringBuffer);
 
-    for(n=0;n<g->data_length;n++)
+    for(n=0;n<ringBufGetFillSize(g->ringBuffer);n++)
     {
       if(g->data[n]<ymin) ymin=g->data[n];
       if(g->data[n]>ymax) ymax=g->data[n];
@@ -216,10 +217,10 @@ void showGraph(graph_t * g)
   
   //client.println("viewBox=\"0 0 700 400\" style="background: red" >");
   client.print("viewBox=\"");
-  client.print(0);
-  client.print(0);
-  client.print(g->width);
-  client.print(g->height);
+  client.print(0);   client.print(" ");
+  client.print(0);  client.print(" ");
+  client.print(g->width+2*GRAPHBORDER);  client.print(" ");
+  client.print(g->height+2*GRAPHBORDER);  client.print(" ");
   client.print("\" "); 
   client.print("style=\"background: "); 
   client.print("lightgrey");
@@ -255,9 +256,9 @@ void showGraph(graph_t * g)
     sprintf(strBuffer, "%d,%d ", x, y);
     client.print(strBuffer);
   }
-  client.print("\" ");
+  client.println("\" ");
 
-  client.print("stroke=\"midnightblue\" fill=\"none\" stroke-width=\"1px\"/>");
+  client.println("stroke=\"midnightblue\" fill=\"none\" stroke-width=\"1px\"/>");
   //*******  end of the line plot **********************************************
 
   // print title
@@ -464,7 +465,8 @@ float getTemperature()
 /***********************************************************************
       end temperature sensor
 ***********************************************************************/
-
+float currentTemperature;
+  
 void setup() 
 {
   // Open serial communications and wait for port to open:
@@ -494,13 +496,17 @@ void setup()
   // xmin xmax ymin ymax 
   Graph1.axis[0]     =    0;  
   Graph1.axis[1]     =  200;
-  Graph1.axis[2]     =  -10;
-  Graph1.axis[3]     =   50; 
-  initTemperatureSensor();   
+  Graph1.axis[2]     =   25;
+  Graph1.axis[3]     =   40; 
+  
+  initTemperatureSensor();
+  currentTemperature = getTemperature();  // make sure that currentTemperature has a value
+
 }
 
 #define SAMPLINGTIME_MS 1000
 #define SAMPLINGTIME_SEC 15*60 // every 15 minutes
+//#define SAMPLINGTIME_SEC 1
 
 void loop()
 {
@@ -508,7 +514,7 @@ void loop()
   static int p=0;
   static unsigned long lastSampled = 0;
          unsigned long now         = millis();
-  static float currentTemperature;
+
   static int samplingTimeCounter=SAMPLINGTIME_SEC;
   
   if( now - lastSampled > 1000 ) 
@@ -525,7 +531,6 @@ void loop()
     }
     Serial.println(samplingTimeCounter);
     samplingTimeCounter++;
-
   }
 
   // listen for incoming clients
@@ -556,7 +561,7 @@ void loop()
 
           // print text message
           client.print("Temperature log SVG graph ");   client.println("<br />");
-          client.print("for Arduino Uno");          //client.println("<br />");
+          client.print("for Arduino Uno ");          //client.println("<br />");
           client.print("with Ethernet Shield");     client.println("<br />");  
           
           client.println("<br />");
@@ -583,7 +588,10 @@ void loop()
           ult.value       =  SAMPLINGTIME_SEC/60;
           ult.unit        = " minutes";
           labelText(&ult);
-         
+          
+          client.println("<br />"); 
+          
+          client.println("</body></html>"); 
           break;
         }
         if (c == '\n') {
