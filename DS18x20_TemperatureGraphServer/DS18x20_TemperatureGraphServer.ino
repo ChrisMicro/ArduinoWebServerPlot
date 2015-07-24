@@ -428,16 +428,22 @@ void setup()
   initTemperatureSensor();   
 }
 
+#define SAMPLINGTIME_MS 1000
+
 void loop()
 {
   int n;
   static int p=0;
+  static unsigned long lastSampled = 0;
+         unsigned long now         = millis();
   
-  //Graph1.data[p]= analogRead(A0);
-  Graph1.data[p]=getTemperature();
-  p++;
-  if(p>GRAPH1_LENGTH-1) p=0;
-  
+  if( now - lastSampled > SAMPLINGTIME_MS ) 
+  {  
+    lastSampled = millis();
+    Graph1.data[p]=getTemperature();
+    p++;
+    if(p>GRAPH1_LENGTH-1) p=0;
+  }
 
   // listen for incoming clients
   client = server.available();
