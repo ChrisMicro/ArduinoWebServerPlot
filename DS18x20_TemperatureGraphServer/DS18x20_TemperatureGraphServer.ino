@@ -53,9 +53,60 @@ EthernetClient client;
 graph_t Graph1;
 
 
-#define GRAPH1_LENGTH 200
+#define GRAPH1_LENGTH 150
 int16_t Graph1_data[GRAPH1_LENGTH]={0};
+ringBuffer_t Graph1_Buffer;
 
+/**********************************************************************************
+
+  start ringBuffer
+  
+**********************************************************************************/
+void ringBufferInit( ringBuffer_t * buf, int16_t *dataArray, uint16_t bufferSize  )
+{
+  buf->bufferSize    = bufferSize;
+  buf->data          = dataArray;
+  buf->writePosition = 0;
+  buf->fillSize      = 0;
+}
+
+void ringBufferAdd(ringBuffer_t * buf, int16_t value)
+{
+  buf->data[buf->writePosition] = value;
+
+  buf->writePosition++;
+
+  // check if wrap arround
+  if ( buf->writePosition >= buf->bufferSize ) buf->writePosition = 0;  
+  
+  buf->fillSize++;
+  // prevent fillSize overflow
+  if(buf->fillSize >= buf->bufferSize) buf->fillSize = buf->bufferSize;
+  
+}
+
+// read a value from position n relative to the current write position
+int16_t ringBufGetValue(ringBuffer_t * buf, uint16_t index)
+{
+  int32_t pos;
+
+  pos = (int32_t)buf->writePosition + index - buf->fillSize;
+
+  if ( pos < 0 ) pos += buf->bufferSize;
+
+  return buf->data[pos];
+}
+
+uint16_t ringBufGetFillSize(ringBuffer_t * buf)
+{
+  return buf->fillSize;
+}
+
+/**********************************************************************************
+
+  start SVG graphics
+  
+**********************************************************************************/
 char strBuffer[40];
 
 void printPar(char * str, int value)
@@ -109,7 +160,7 @@ void text(int x, int y, char *str, int rotation)
 
 void showGraph(graph_t * g)
 {
-  int n;
+  int n,k;
   
   float xscale=2.0;
   float yscale=1.0;
@@ -170,13 +221,17 @@ void showGraph(graph_t * g)
   
   //********* start of the line plot ****************
   client.println("<polyline points=\"");
-  for (n = 0; n < g->data_length ; ++n)
+
+  k=ringBufGetFillSize(g->ringBuffer);
+
+  for (n = 0; n < k ; n++)
   {
     int x,xn;
     int y,yn;
     
     xn=n;
-    yn=g->data[n];
+    //yn=g->data[n];
+    yn=ringBufGetValue(g->ringBuffer,n);
     
     // limit to borders
     if( xn > xmax) xn=xmax;
@@ -412,6 +467,9 @@ void setup()
   Serial.print("server is at ");
   Serial.println(Ethernet.localIP());
   
+  ringBufferInit(&Graph1_Buffer, Graph1_data, GRAPH1_LENGTH);
+  
+  Graph1.ringBuffer  = &Graph1_Buffer;
   Graph1.title       = "DS18x20 Temperature Sensor";
   Graph1.xlabel      = "[n]";
   Graph1.ylabel      = "temperature [degree C]";
@@ -440,9 +498,12 @@ void loop()
   if( now - lastSampled > SAMPLINGTIME_MS ) 
   {  
     lastSampled = millis();
-    Graph1.data[p]=getTemperature();
-    p++;
-    if(p>GRAPH1_LENGTH-1) p=0;
+    ringBufferAdd(&Graph1_Buffer, getTemperature());
+
+    Graph1.data_length=ringBufGetFillSize(&Graph1_Buffer);
+    //Graph1.data[p]=getTemperature();
+    //p++;
+    //if(p>GRAPH1_LENGTH-1) p=0;
   }
 
   // listen for incoming clients
