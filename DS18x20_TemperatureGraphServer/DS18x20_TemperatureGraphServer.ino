@@ -156,6 +156,14 @@ void text(int x, int y, char *str, int rotation)
     //<text x="0" y="15" fill="red" transform="rotate(30 20,40)">I love SVG</text>
 }
 
+void labelText(labelText_t * lt)
+{
+  client.print(lt->description);
+  dtostrf(lt->value,5,1,strBuffer);
+  client.print(strBuffer);
+  client.print(lt->unit);
+}
+
 #define GRAPHBORDER 40
 
 void showGraph(graph_t * g)
@@ -171,12 +179,14 @@ void showGraph(graph_t * g)
   int ymax=-32767;
   
   xmin=0;
-  xmax=g->data_length;
+  //xmax=g->data_length;
+  xmax=ringBufGetFillSize(g->ringBuffer)-1;
   
   if(g->autoscale)
   {
     g->axis[0] = 0;  
-    g->axis[1] = g->data_length;
+    //g->axis[1] = g->data_length;
+    g->axis[1]=ringBufGetFillSize(g->ringBuffer);
 
     for(n=0;n<g->data_length;n++)
     {
@@ -268,11 +278,13 @@ void showGraph(graph_t * g)
   text(GRAPHBORDER+g->width,g->height + GRAPHBORDER + GRAPHBORDER/2 ,strBuffer,0);
   
     // axis ymin
-  sprintf(strBuffer,"%d",g->axis[2]);
+  //sprintf(strBuffer,"%d",g->axis[2]*g->yScale);
+  dtostrf(g->axis[2]*g->yScale,5,1,strBuffer);
   text(GRAPHBORDER/2,g->height + GRAPHBORDER ,strBuffer,0);
   
-    // axis ymax
-  sprintf(strBuffer,"%d",g->axis[3]);
+  // axis ymax
+  //sprintf(strBuffer,"%d",g->axis[3]*g->yScale);
+  dtostrf(g->axis[3]*g->yScale,5,1,strBuffer);
   text(GRAPHBORDER/2,GRAPHBORDER ,strBuffer,0);
   
   client.println("</svg>");
@@ -471,13 +483,14 @@ void setup()
   
   Graph1.ringBuffer  = &Graph1_Buffer;
   Graph1.title       = "DS18x20 Temperature Sensor";
-  Graph1.xlabel      = "[n]";
+  Graph1.xlabel      = "time";
   Graph1.ylabel      = "temperature [degree C]";
   Graph1.data        = Graph1_data;
   Graph1.data_length = GRAPH1_LENGTH;
   Graph1.width       = 420;
   Graph1.height      = 300;
   Graph1.autoscale   = true;
+  Graph1.yScale      = 0.01;
   // xmin xmax ymin ymax 
   Graph1.axis[0]     =    0;  
   Graph1.axis[1]     =  200;
@@ -487,6 +500,7 @@ void setup()
 }
 
 #define SAMPLINGTIME_MS 1000
+#define SAMPLINGTIME_SEC 15*60 // every 15 minutes
 
 void loop()
 {
@@ -494,16 +508,24 @@ void loop()
   static int p=0;
   static unsigned long lastSampled = 0;
          unsigned long now         = millis();
+  static float currentTemperature;
+  static int samplingTimeCounter=SAMPLINGTIME_SEC;
   
-  if( now - lastSampled > SAMPLINGTIME_MS ) 
+  if( now - lastSampled > 1000 ) 
   {  
     lastSampled = millis();
-    ringBufferAdd(&Graph1_Buffer, getTemperature());
+    
+    currentTemperature = getTemperature();
+    
+    if( samplingTimeCounter >= SAMPLINGTIME_SEC )
+    {
+      ringBufferAdd(&Graph1_Buffer, currentTemperature*100);
+      samplingTimeCounter=0;
+      Serial.println("nextLog");
+    }
+    Serial.println(samplingTimeCounter);
+    samplingTimeCounter++;
 
-    Graph1.data_length=ringBufGetFillSize(&Graph1_Buffer);
-    //Graph1.data[p]=getTemperature();
-    //p++;
-    //if(p>GRAPH1_LENGTH-1) p=0;
   }
 
   // listen for incoming clients
@@ -533,17 +555,35 @@ void loop()
           client.println("<body bgcolor=\"#E6E6FA\">");
 
           // print text message
-          client.print("Multi SVG Graph Server ");   //client.println("<br />");
+          client.print("Temperature log SVG graph ");   client.println("<br />");
           client.print("for Arduino Uno");          //client.println("<br />");
-          client.print("with Ethernet Shield");     client.println("<br />");  client.println("<br />");
-
+          client.print("with Ethernet Shield");     client.println("<br />");  
+          
+          client.println("<br />");
+          
+          labelText_t lt;
+          lt.description="temperature:";
+          lt.value=currentTemperature;
+          lt.unit=" celsius";
+          labelText(&lt);
+          
+          client.println("<br />");
+          client.println("<br />");  
+          
           client.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
 
           //******** start the SVG grafics ********************************************
           
           showGraph(&Graph1);
-
-
+          
+          client.println("<br />"); 
+                    
+          labelText_t ult;
+          ult.description = "sampling time:";
+          ult.value       =  SAMPLINGTIME_SEC/60;
+          ult.unit        = " minutes";
+          labelText(&ult);
+         
           break;
         }
         if (c == '\n') {
