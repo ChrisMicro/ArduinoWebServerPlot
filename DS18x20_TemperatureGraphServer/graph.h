@@ -2,13 +2,7 @@
 
 #include <stdint.h>
 
-typedef struct
-{
-  uint16_t bufferSize;
-  int16_t *data;
-  uint16_t fillSize;
-  uint16_t writePosition;
-}ringBuffer_t;
+
 
 typedef struct
 {
