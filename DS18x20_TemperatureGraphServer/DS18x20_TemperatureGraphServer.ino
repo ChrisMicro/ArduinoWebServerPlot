@@ -60,8 +60,6 @@ graph_t Graph1;
 int16_t Graph1_data[GRAPH1_LENGTH]={0};
 ringBuffer_t Graph1_Buffer;
 
-
-
 /**********************************************************************************
 
   start SVG graphics
@@ -72,9 +70,7 @@ char strBuffer[40];
 void printPar(char * str, int value)
 {
     client.print(str);
-    client.print("=\"");
-    client.print(value);
-    client.print("\" ");
+    client.print("=\""); client.print(value); client.print("\" ");
 }
 
 void rect(int x,int y,int width, int height)
@@ -251,8 +247,9 @@ void showGraph(graph_t * g)
 }
 
 /***********************************************************************
-      end temperature sensor
+      end SVG graphics
 ***********************************************************************/
+
 float currentTemperature;
 #define TEMPERATURESCALEFACTOR 100.0
 
@@ -317,7 +314,7 @@ void loop()
     {
       ringBufferAdd(&Graph1_Buffer, currentTemperature*TEMPERATURESCALEFACTOR);
       samplingTimeCounter=0;
-      Serial.println("nextLog");
+      Serial.println(F("nextLog"));
     }
     Serial.println(samplingTimeCounter);
     samplingTimeCounter++;
@@ -326,7 +323,7 @@ void loop()
   // listen for incoming clients
   client = server.available();
   if (client) {
-    Serial.println("new client");
+    Serial.println(F("new client"));
     // an http request ends with a blank line
     boolean currentLineIsBlank = true;
     while (client.connected()) {
@@ -339,22 +336,22 @@ void loop()
         if (c == '\n' && currentLineIsBlank)
         {
           // send a standard http response header
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println("Connection: close");  // the connection will be closed after completion of the response
-          client.println("Refresh: 5");  // refresh the page automatically every 5 sec
+          client.println( F("HTTP/1.1 200 OK" ) );
+          client.println( F("Content-Type: text/html") );
+          client.println( F("Connection: close") );  // the connection will be closed after completion of the response
+          client.println( F("Refresh: 10") );  // refresh the page automatically every 5 sec
 
           client.println();
-          client.println("<!DOCTYPE HTML>");
-          client.println("<html>");
-          client.println("<body bgcolor=\"#E6E6FA\">");
+          client.println( F("<!DOCTYPE HTML>") );
+          client.println( F("<html>") );
+          client.println( F("<body bgcolor=\"#E6E6FA\">") );
 
           // print text message
-          client.print("Temperature log SVG graph ");   client.println("<br />");
-          client.print("for Arduino Uno ");          //client.println("<br />");
-          client.print("with Ethernet Shield");     client.println("<br />");  
+          client.print( F("Temperature log SVG graph ") );   client.println( F("<br />") );
+          client.print( F("for Arduino Uno ") );          //client.println("<br />");
+          client.print( F("with Ethernet Shield") );     client.println( F("<br />") );  
           
-          client.println("<br />");
+          client.println( F("<br />") );
           
           labelText_t lt;
           lt.description="temperature:";
@@ -362,16 +359,14 @@ void loop()
           lt.unit=" celsius";
           labelText(&lt);
           
-          client.println("<br />");
-          client.println("<br />");  
+          client.println( F("<br />") );
+          client.println( F("<br />") );  
           
-          client.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-
-          //******** start the SVG grafics ********************************************
+          client.println( F("<?xml version=\"1.0\" encoding=\"UTF-8\"?>") );
           
           showGraph(&Graph1);
           
-          client.println("<br />"); 
+          client.println( F("<br />") ); 
                     
           labelText_t ult;
           ult.description = "sampling time:";
@@ -379,9 +374,17 @@ void loop()
           ult.unit        = " minutes";
           labelText(&ult);
           
-          client.println("<br />"); 
+          client.println( F("<br />") ); 
+          client.println( F("<form action=\"light_on.html\">") );
+          client.println( F("<input type=\"submit\" value=\"Submit\">") );
+          client.println( F( "</form>") );
           
-          client.println("</body></html>"); 
+          client.println( F("<form>") );
+          client.println( F("First name:<br>") );
+          client.println( F("<input type=\"text\" name=\"firstname\">") );
+          client.println( F("<br>") );       
+          client.println( F("</body></html>") ); 
+          
           break;
         }
         if (c == '\n') {
@@ -398,7 +401,7 @@ void loop()
     delay(1);
     // close the connection:
     client.stop();
-    Serial.println("client disconnected");
+    Serial.println(F("client disconnected"));
   }
 }
 

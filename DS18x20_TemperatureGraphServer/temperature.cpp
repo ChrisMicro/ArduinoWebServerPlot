@@ -17,6 +17,7 @@
 ************************************************************************/
 
 #include <OneWire.h>
+#include "temperature.h"
 
 #define ONEWIRE_PIN 2
 
@@ -35,7 +36,7 @@ void initTemperatureSensor()
   {
     if ( !ds.search(addr)) 
     {
-        #ifdef DEBUG_TEMPERATURESENSOR_ON
+        #ifdef DEBUG_TEMPERATURESENSOR_ON 
       Serial.println("No more addresses.");
       Serial.println();
       #endif
